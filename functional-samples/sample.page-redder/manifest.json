@@ -4,7 +4,14 @@
   "manifest_version": 3,
   "version": "0.1",
   "description": "Turns the page red when you click the icon",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "matches": ["https://3icecream.com/difficulty_list/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "background": {
     "service_worker": "service-worker.js"
   }
