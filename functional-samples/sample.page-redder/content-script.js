@@ -157,9 +157,95 @@ function addButtonToSongInfo() {
       }
     });
 
-    // Add both buttons to the container
+    // Create the export button
+    const exportButton = document.createElement('button');
+    exportButton.id = 'export-button';
+    exportButton.textContent = 'Export Database';
+    exportButton.style.cssText = 'margin: 10px; padding: 10px 20px; cursor: pointer; background-color: #4CAF50; color: white;';
+
+    // Add click handler to export data
+    exportButton.addEventListener('click', () => {
+      chrome.storage.local.get(['songDataDict'], (result) => {
+        const songDataDict = result.songDataDict || {};
+
+        // Convert to JSON
+        const jsonData = JSON.stringify(songDataDict, null, 2);
+
+        // Create blob and download
+        const blob = new Blob([jsonData], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `song-database-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        console.log('Database exported');
+        exportButton.textContent = 'Exported!';
+        setTimeout(() => {
+          exportButton.textContent = 'Export Database';
+        }, 1000);
+      });
+    });
+
+    // Create the import button
+    const importButton = document.createElement('button');
+    importButton.id = 'import-button';
+    importButton.textContent = 'Import Database';
+    importButton.style.cssText = 'margin: 10px; padding: 10px 20px; cursor: pointer; background-color: #2196F3; color: white;';
+
+    // Add click handler to import data
+    importButton.addEventListener('click', () => {
+      // Create hidden file input
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.json';
+
+      fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const importedData = JSON.parse(event.target.result);
+
+            // Merge with existing data (imported data takes precedence)
+            chrome.storage.local.get(['songDataDict'], (result) => {
+              const existingData = result.songDataDict || {};
+              const mergedData = { ...existingData, ...importedData };
+
+              chrome.storage.local.set({ songDataDict: mergedData }, () => {
+                console.log('Database imported and merged');
+                console.log('Total songs after import:', Object.keys(mergedData).length);
+
+                // Update opacity after import
+                updateSavedSongsOpacity();
+
+                importButton.textContent = 'Imported!';
+                setTimeout(() => {
+                  importButton.textContent = 'Import Database';
+                }, 1000);
+              });
+            });
+          } catch (error) {
+            console.error('Error parsing JSON file:', error);
+            alert('Error importing file. Please ensure it is a valid JSON file.');
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      fileInput.click();
+    });
+
+    // Add all buttons to the container
     songInfoContainer.appendChild(button);
     songInfoContainer.appendChild(clearButton);
+    songInfoContainer.appendChild(exportButton);
+    songInfoContainer.appendChild(importButton);
   }
 }
 
