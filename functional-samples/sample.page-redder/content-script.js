@@ -241,12 +241,222 @@ function addButtonToSongInfo() {
       fileInput.click();
     });
 
+    // Create the view data button
+    const viewButton = document.createElement('button');
+    viewButton.id = 'view-data-button';
+    viewButton.textContent = 'View All Data';
+    viewButton.style.cssText = 'margin: 10px; padding: 10px 20px; cursor: pointer; background-color: #9C27B0; color: white;';
+
+    // Add click handler to open data viewer
+    viewButton.addEventListener('click', () => {
+      chrome.storage.local.get(['songDataDict'], (result) => {
+        const songDataDict = result.songDataDict || {};
+        openDataViewer(songDataDict);
+      });
+    });
+
     // Add all buttons to the container
     songInfoContainer.appendChild(button);
     songInfoContainer.appendChild(clearButton);
     songInfoContainer.appendChild(exportButton);
     songInfoContainer.appendChild(importButton);
+    songInfoContainer.appendChild(viewButton);
   }
+}
+
+// Function to open data viewer window
+function openDataViewer(songDataDict) {
+  // Group songs by difficulty level
+  const songsByDifficulty = {};
+
+  Object.entries(songDataDict).forEach(([key, song]) => {
+    // Extract difficulty level number from difficulty string (e.g., "ESP 15" or "CSP 19.99" -> "15" or "19")
+    const diffMatch = song.difficulty.match(/(\d+)(?:\.\d+)?$/);
+    const diffLevel = diffMatch ? diffMatch[1] : 'Unknown';
+
+    if (!songsByDifficulty[diffLevel]) {
+      songsByDifficulty[diffLevel] = [];
+    }
+
+    songsByDifficulty[diffLevel].push(song);
+  });
+
+  // Sort difficulty levels numerically
+  const sortedDiffLevels = Object.keys(songsByDifficulty).sort((a, b) => {
+    if (a === 'Unknown') return 1;
+    if (b === 'Unknown') return -1;
+    return parseInt(a) - parseInt(b);
+  });
+
+  // Create modal overlay
+  const overlay = document.createElement('div');
+  overlay.id = 'data-viewer-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  `;
+
+  // Create modal window
+  const modal = document.createElement('div');
+  modal.style.cssText = `
+    background: white;
+    width: 80%;
+    max-width: 1200px;
+    height: 80%;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  `;
+
+  // Create header
+  const header = document.createElement('div');
+  header.style.cssText = `
+    padding: 20px;
+    background: #333;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  `;
+  header.innerHTML = `
+    <h2 style="margin: 0;">Song Database (${Object.keys(songDataDict).length} songs)</h2>
+    <button id="close-viewer" style="background: #f44336; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Close</button>
+  `;
+
+  // Create tabs container
+  const tabsContainer = document.createElement('div');
+  tabsContainer.style.cssText = `
+    display: flex;
+    background: #f0f0f0;
+    overflow-x: auto;
+    border-bottom: 2px solid #ccc;
+  `;
+
+  // Create content container
+  const contentContainer = document.createElement('div');
+  contentContainer.style.cssText = `
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  `;
+
+  // Create tabs and content
+  sortedDiffLevels.forEach((diffLevel, index) => {
+    const songs = songsByDifficulty[diffLevel];
+
+    // Create tab button
+    const tab = document.createElement('button');
+    tab.className = 'difficulty-tab';
+    tab.dataset.difficulty = diffLevel;
+    tab.textContent = `Level ${diffLevel} (${songs.length})`;
+    tab.style.cssText = `
+      padding: 15px 25px;
+      border: none;
+      background: ${index === 0 ? '#2196F3' : '#f0f0f0'};
+      color: ${index === 0 ? 'white' : '#333'};
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      white-space: nowrap;
+      transition: background 0.3s;
+    `;
+
+    tab.addEventListener('click', () => {
+      // Update tab styles
+      document.querySelectorAll('.difficulty-tab').forEach(t => {
+        t.style.background = '#f0f0f0';
+        t.style.color = '#333';
+      });
+      tab.style.background = '#2196F3';
+      tab.style.color = 'white';
+
+      // Show corresponding content
+      document.querySelectorAll('.difficulty-content').forEach(c => {
+        c.style.display = 'none';
+      });
+      document.getElementById(`content-${diffLevel}`).style.display = 'block';
+    });
+
+    tabsContainer.appendChild(tab);
+
+    // Create content for this difficulty
+    const content = document.createElement('div');
+    content.id = `content-${diffLevel}`;
+    content.className = 'difficulty-content';
+    content.style.display = index === 0 ? 'block' : 'none';
+
+    // Sort songs by title
+    songs.sort((a, b) => a.title.localeCompare(b.title));
+
+    // Create table
+    const table = document.createElement('table');
+    table.style.cssText = `
+      width: 100%;
+      border-collapse: collapse;
+    `;
+
+    table.innerHTML = `
+      <thead>
+        <tr style="background: #f5f5f5; border-bottom: 2px solid #ddd;">
+          <th style="padding: 12px; text-align: left;">Title</th>
+          <th style="padding: 12px; text-align: left;">Difficulty</th>
+          <th style="padding: 12px; text-align: left;">Hidden</th>
+          <th style="padding: 12px; text-align: left;">Song ID</th>
+          <th style="padding: 12px; text-align: left;">Diff Param</th>
+          <th style="padding: 12px; text-align: left;">Date Added</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${songs.map((song, i) => `
+          <tr style="border-bottom: 1px solid #eee; ${i % 2 === 0 ? 'background: #fafafa;' : ''}">
+            <td style="padding: 12px;">${song.title}</td>
+            <td style="padding: 12px;">${song.difficulty}</td>
+            <td style="padding: 12px;">
+              <span style="padding: 4px 8px; border-radius: 4px; ${song.hidden ? 'background: #ff9800; color: white;' : 'background: #4CAF50; color: white;'}">
+                ${song.hidden ? 'Yes' : 'No'}
+              </span>
+            </td>
+            <td style="padding: 12px; font-family: monospace; font-size: 11px;">${song.songId || 'N/A'}</td>
+            <td style="padding: 12px;">${song.diffParam || 'N/A'}</td>
+            <td style="padding: 12px;">${new Date(song.timestamp).toLocaleString()}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    `;
+
+    content.appendChild(table);
+    contentContainer.appendChild(content);
+  });
+
+  // Assemble modal
+  modal.appendChild(header);
+  modal.appendChild(tabsContainer);
+  modal.appendChild(contentContainer);
+  overlay.appendChild(modal);
+
+  // Add close handler
+  header.querySelector('#close-viewer').addEventListener('click', () => {
+    document.body.removeChild(overlay);
+  });
+
+  // Close on overlay click
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) {
+      document.body.removeChild(overlay);
+    }
+  });
+
+  // Add to page
+  document.body.appendChild(overlay);
 }
 
 // Run the function when the page loads
