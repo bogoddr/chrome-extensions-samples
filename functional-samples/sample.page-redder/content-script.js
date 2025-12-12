@@ -1,5 +1,17 @@
 // This script runs automatically on pages matching the URL patterns in manifest.json
 
+// Add custom CSS to the page
+const style = document.createElement('style');
+style.textContent = `
+  #song-title {
+    font-size: 12px !important;
+  }
+  #song-diff {
+    font-size: 12px !important;
+  }
+`;
+document.head.appendChild(style);
+
 // Function to update opacity of saved songs
 function updateSavedSongsOpacity() {
   chrome.storage.local.get(['songDataDict'], (result) => {
@@ -7,6 +19,12 @@ function updateSavedSongsOpacity() {
 
     // Get all .div-jacket elements
     const jacketElements = document.querySelectorAll('.div-jacket');
+
+    // Count total songs on page using .img-jacket elements
+    const totalSongsOnPage = document.querySelectorAll('.div-jacket').length;
+
+    // Track hidden songs on current page
+    let hiddenSongsOnPage = 0;
 
     jacketElements.forEach(jacket => {
       const id = jacket.id;
@@ -24,15 +42,23 @@ function updateSavedSongsOpacity() {
         );
 
         if (song && song.hidden) {
+          hiddenSongsOnPage++;
           jacket.style.opacity = '0.075';
         } else {
-          // Reset opacity if not hidden
+          // Reset opacity if not hidden or not in storage
           jacket.style.opacity = '';
         }
       }
     });
 
+    // Update counter display
+    const counter = document.getElementById('song-counter');
+    if (counter) {
+      counter.textContent = `${hiddenSongsOnPage} / ${totalSongsOnPage} complete`;
+    }
+
     console.log(`Updated opacity for ${jacketElements.length} jacket elements`);
+    console.log(`Hidden songs on page: ${hiddenSongsOnPage} / Total songs on page: ${totalSongsOnPage}`);
   });
 }
 
@@ -59,6 +85,13 @@ function addButtonToSongInfo() {
   const songInfoContainer = document.querySelector('#song-info-container');
 
   if (songInfoContainer) {
+    // Create counter element
+    const counter = document.createElement('div');
+    counter.id = 'song-counter';
+    counter.style.cssText = 'margin: 10px; padding: 10px; background-color: #333; color: white; border-radius: 4px; font-weight: bold; text-align: center; font-size: 16px;';
+    counter.textContent = 'Hidden: 0 / Total: 0';
+    songInfoContainer.appendChild(counter);
+
     // Create the save button
     const button = document.createElement('button');
     button.id = 'custom-action-button';
