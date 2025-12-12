@@ -3,8 +3,11 @@
 // Add custom CSS to the page
 const style = document.createElement('style');
 style.textContent = `
+#song-info {
+  margin:0 !important;
+}
   #song-title {
-    font-size: 12px !important;
+    font-size: 15px !important;
   }
   #song-diff {
     font-size: 12px !important;
